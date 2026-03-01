@@ -122,19 +122,34 @@ public class Main {
             System.out.println("할 일이 없습니다.");
             return;
         }
-        System.out.println("=== 할 일 목록 ===");
 
+        System.out.println("=== 할 일 목록 (미완료 먼저) ===");
+
+        // 완료 개수 먼저 계산(요약용)
         int done = 0;
         for (Todo t : todos) {
-            if(t.isDone()) done++;
-            t.print();
+            if (t.isDone()) done++;
+        }
+
+        // 1) 미완료 먼저 출력
+        for (Todo t : todos) {
+            if (!t.isDone()) {
+                t.print();
+            }
+        }
+
+        // 2) 완료 출력
+        for (Todo t : todos) {
+            if (t.isDone()) {
+                t.print();
+            }
         }
 
         int total = todos.size();
         int remaining = total - done;
-        int percent = (total == 0) ? 0 : (done *100/ total);
+        int percent = (total == 0) ? 0 : (done * 100 / total);
 
-        System.out.println("총 "+total+"개 / 완료 "+done+"개 / 남은 "+ remaining + "개 (" + percent + "%)");
+        System.out.println("총 " + total + "개 / 완료 " + done + "개 / 남은 " + remaining + "개 (" + percent + "%)");
     }
 
     private static Todo findById(ArrayList<Todo> todos, int id) {
