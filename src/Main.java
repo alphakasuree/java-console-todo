@@ -44,6 +44,17 @@ public class Main {
                 } else {
                     System.out.println("해당 id를 찾을 수 없습니다.");
                 }
+            } else if (choice == 6) { // 제목 수정
+                int id = readInt(sc, "수정할 id 입력: ");
+                Todo t = findById(todos, id);
+
+                if (t == null) {
+                    System.out.println("해당 id를 찾을 수 없습니다.");
+                } else {
+                    String newTitle = readNonEmptyLine(sc, "새 제목 입력: ");
+                    t.setTitle(newTitle);
+                    System.out.println("수정 완료!");
+                }
 
             } else if (choice == 5) { // 종료
                 System.out.println("종료합니다.");
@@ -65,6 +76,7 @@ public class Main {
         System.out.println("3) 완료처리");
         System.out.println("4) 삭제");
         System.out.println("5) 종료");
+        System.out.println("6) 제목 수정");
     }
 
     // ====== 입력 유틸 (버퍼/nextLine 문제 방지: 전부 nextLine 기반) ======
@@ -84,7 +96,7 @@ public class Main {
         while (true) {
             System.out.print(prompt);
             String line = sc.nextLine();
-            if (!line.isEmpty()) return line.trim();
+            if (!line.isBlank()) return line.trim();
             System.out.println("빈 값은 안 돼. 다시 입력해줘.");
         }
     }

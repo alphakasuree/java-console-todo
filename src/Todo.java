@@ -25,4 +25,8 @@ public class Todo {
         String status = done ? "완료" : "미완료";
         System.out.println(id + ". [" + status + "] " + title);
     }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
 }
