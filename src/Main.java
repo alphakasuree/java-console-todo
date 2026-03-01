@@ -44,7 +44,7 @@ public class Main {
                 } else {
                     System.out.println("해당 id를 찾을 수 없습니다.");
                 }
-            } else if (choice == 6) { // 제목 수정
+            } else if (choice == 5) { // 제목 수정
                 int id = readInt(sc, "수정할 id 입력: ");
                 Todo t = findById(todos, id);
 
@@ -55,13 +55,27 @@ public class Main {
                     t.setTitle(newTitle);
                     System.out.println("수정 완료!");
                 }
+            } else if (choice == 6) { // 검색
+                String keyword = readNonEmptyLine(sc, "검색 키워드 입력: ");
+                boolean found = false;
 
-            } else if (choice == 5) { // 종료
+                System.out.println("=== 검색 결과 ===");
+                for (Todo todo : todos) {
+                    if (todo.getTitle().contains(keyword)) {
+                        todo.print();
+                        found = true;
+                    }
+                }
+
+                if (!found) {
+                    System.out.println("검색 결과가 없습니다.");
+                }
+            } else if (choice == 7) { // 종료
                 System.out.println("종료합니다.");
                 break;
 
             } else {
-                System.out.println("잘못된 선택입니다. (1~5)");
+                System.out.println("잘못된 선택입니다. (1~7)");
             }
         }
 
@@ -75,8 +89,9 @@ public class Main {
         System.out.println("2) 목록");
         System.out.println("3) 완료처리");
         System.out.println("4) 삭제");
-        System.out.println("5) 종료");
-        System.out.println("6) 제목 수정");
+        System.out.println("5) 제목 수정");
+        System.out.println("6) 검색");
+        System.out.println("7) 종료");
     }
 
     // ====== 입력 유틸 (버퍼/nextLine 문제 방지: 전부 nextLine 기반) ======
