@@ -61,7 +61,7 @@ public class Main {
 
                 System.out.println("=== 검색 결과 ===");
                 for (Todo todo : todos) {
-                    if (todo.getTitle().contains(keyword)) {
+                    if (todo.getTitle().toLowerCase().contains(keyword.toLowerCase())) {
                         todo.print();
                         found = true;
                     }
