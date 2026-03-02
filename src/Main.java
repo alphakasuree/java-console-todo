@@ -1,7 +1,13 @@
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.io.IOException;
 
 public class Main {
+    private static final String DATA_FILE = "todos.txt";
 
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
@@ -70,12 +76,18 @@ public class Main {
                 if (!found) {
                     System.out.println("검색 결과가 없습니다.");
                 }
-            } else if (choice == 7) { // 종료
+            } else if (choice == 7) { // 저장
+                saveToFile(todos);
+
+            } else if (choice == 8) { // 불러오기
+                nextId = loadFromFile(todos); // ★ 불러온 뒤 nextId 보정
+
+            } else if (choice == 9) { // 종료
                 System.out.println("종료합니다.");
                 break;
 
             } else {
-                System.out.println("잘못된 선택입니다. (1~7)");
+                System.out.println("잘못된 선택입니다. (1~9)");
             }
         }
 
@@ -91,7 +103,9 @@ public class Main {
         System.out.println("4) 삭제");
         System.out.println("5) 제목 수정");
         System.out.println("6) 검색");
-        System.out.println("7) 종료");
+        System.out.println("7) 저장");
+        System.out.println("8) 불러오기");
+        System.out.println("9) 종료");
     }
 
     // ====== 입력 유틸 (버퍼/nextLine 문제 방지: 전부 nextLine 기반) ======
@@ -167,5 +181,81 @@ public class Main {
             }
         }
         return false;
+    }
+
+    private static void saveToFile(ArrayList<Todo> todos) {
+        java.util.ArrayList<String> lines = new java.util.ArrayList<>();
+
+        // 한 줄 = id|done|title
+        for (Todo t : todos) {
+            String safeTitle = t.getTitle().replace("\n",  " ").replace("\r", " ");
+            lines.add(t.getId() + "|" + t.isDone() + "|" + safeTitle);
+        }
+
+        try {
+            java.nio.file.Files.write(
+                    java.nio.file.Path.of(DATA_FILE),
+                    lines,
+                    java.nio.charset.StandardCharsets.UTF_8
+            );
+            System.out.println("저장 완료! (" + DATA_FILE + ")");
+        } catch (java.io.IOException e) {
+            System.out.println("저장 실패: " + e.getMessage());
+        }
+    }
+
+    private static int loadFromFile(ArrayList<Todo> todos) {
+        java.nio.file.Path path = java.nio.file.Path.of(DATA_FILE);
+
+        if (!java.nio.file.Files.exists(path)) {
+            System.out.println("저장 파일이 없습니다. (" + DATA_FILE + ")");
+            return calcNextId(todos);
+        }
+
+        try {
+            java.util.List<String> lines =
+                    java.nio.file.Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8);
+
+            todos.clear(); // ★ 기존 목록 제거(중복 방지)
+            int maxId = 0;
+
+            for (String line : lines) {
+                if (line == null) continue;
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                // ★ limit=3: title에 |가 있어도 안전
+                String[] parts = line.split("\\|", 3);
+                if (parts.length < 3) continue;
+
+                int id = Integer.parseInt(parts[0]);
+                boolean done = Boolean.parseBoolean(parts[1]);
+                String title = parts[2];
+
+                Todo t = new Todo(id, title);
+                if (done) t.markDone();
+
+                todos.add(t);
+                if (id > maxId) maxId = id;
+            }
+
+            System.out.println("불러오기 완료! (" + todos.size() + "개)");
+            return maxId + 1;
+
+        } catch (java.io.IOException e) {
+            System.out.println("불러오기 실패: " + e.getMessage());
+            return calcNextId(todos);
+        } catch (NumberFormatException e) {
+            System.out.println("불러오기 실패(형식 오류): " + e.getMessage());
+            return calcNextId(todos);
+        }
+    }
+
+    private static int calcNextId(ArrayList<Todo> todos) {
+        int maxId = 0;
+        for (Todo t : todos) {
+            if (t.getId() > maxId) maxId = t.getId();
+        }
+        return maxId + 1;
     }
 }
