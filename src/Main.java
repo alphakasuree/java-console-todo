@@ -5,10 +5,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 public class Main {
 
-    // ✅ Orbit 저장 파일(이것만 사용)
     private static final Path DATA_PATH = Path.of("orbit_todos.txt");
 
     public static void main(String[] args) {
@@ -22,7 +23,11 @@ public class Main {
 
             if (choice == 1) { // 추가
                 String title = readNonEmptyLine(sc, "할 일 제목: ");
-                todos.add(new Todo(nextId, title));
+                int priority = readPriority(sc, "중요도(1~5): ");
+                LocalDate due = readOptionalDate(sc, "마감일(YYYY-MM-DD, 없으면 Enter): ");
+                String desc = readOptionalLine(sc, "설명(없으면 Enter): ");
+
+                todos.add(new Todo(nextId, title, priority, due, desc));
                 System.out.println("추가 완료! (id=" + nextId + ")");
                 nextId++;
 
@@ -65,11 +70,14 @@ public class Main {
 
             } else if (choice == 6) { // 검색
                 String keyword = readNonEmptyLine(sc, "검색 키워드 입력: ");
+                String k = keyword.toLowerCase();
                 boolean found = false;
 
                 System.out.println("=== 검색 결과 ===");
                 for (Todo todo : todos) {
-                    if (todo.getTitle().toLowerCase().contains(keyword.toLowerCase())) {
+                    String title = todo.getTitle().toLowerCase();
+                    String desc = todo.getDescription().toLowerCase();
+                    if (title.contains(k) || desc.contains(k)) {
                         todo.print();
                         found = true;
                     }
@@ -133,6 +141,32 @@ public class Main {
         }
     }
 
+    private static String readOptionalLine(Scanner sc, String prompt) {
+        System.out.print(prompt);
+        return sc.nextLine().trim();
+    }
+
+    private static int readPriority(Scanner sc, String prompt) {
+        while (true) {
+            int p = readInt(sc, prompt);
+            if (p >= 1 && p <= 5) return p;
+            System.out.println("중요도는 1~5 사이로 입력해줘.");
+        }
+    }
+
+    private static LocalDate readOptionalDate(Scanner sc, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = sc.nextLine().trim();
+            if (line.isEmpty()) return null;
+            try {
+                return LocalDate.parse(line); // YYYY-MM-DD
+            } catch (DateTimeParseException e) {
+                System.out.println("형식이 올바르지 않아. 예: 2026-03-10");
+            }
+        }
+    }
+
     // ====== 기능 메서드 ======
     // 목록 출력: 미완료 먼저, 완료는 아래 (출력 순서만 정렬)
     private static void printTodos(ArrayList<Todo> todos) {
@@ -181,12 +215,24 @@ public class Main {
 
     // ====== 저장/불러오기 ======
     // 포맷: id|done|title  (한 줄 = 한 Todo)
+    // 예: id=1|done=false|priority=3|due=2026-03-10|title=...|desc=...
     private static void saveToFile(ArrayList<Todo> todos) {
         List<String> lines = new ArrayList<>();
 
         for (Todo t : todos) {
-            String safeTitle = t.getTitle().replace("\n", " ").replace("\r", " ");
-            lines.add(t.getId() + "|" + t.isDone() + "|" + safeTitle);
+            String due = (t.getDueDate() == null) ? "" : t.getDueDate().toString();
+
+            String titleEnc = encode(t.getTitle());
+            String descEnc = encode(t.getDescription());
+
+            String line = "id=" + t.getId()
+                    + "|done=" + t.isDone()
+                    + "|priority=" + t.getPriority()
+                    + "|due=" + due
+                    + "|title=" + titleEnc
+                    + "|desc=" + descEnc;
+
+            lines.add(line);
         }
 
         try {
@@ -214,18 +260,27 @@ public class Main {
                 line = line.trim();
                 if (line.isEmpty()) continue;
 
-                String[] parts = line.split("\\|", 3);
-                if (parts.length < 3) continue;
+                Todo t;
 
-                int id = Integer.parseInt(parts[0]);
-                boolean done = Boolean.parseBoolean(parts[1]);
-                String title = parts[2];
+                // ✅ 새 포맷 판단: id= 포함이면 key=value 포맷
+                if (line.contains("id=")) {
+                    t = parseKeyValueTodo(line);
+                    if (t == null) continue;
+                } else {
+                    // ✅ 구포맷 호환: id|done|title
+                    String[] parts = line.split("\\|", 3);
+                    if (parts.length < 3) continue;
 
-                Todo t = new Todo(id, title);
-                if (done) t.markDone();
+                    int id = Integer.parseInt(parts[0]);
+                    boolean done = Boolean.parseBoolean(parts[1]);
+                    String title = parts[2];
+
+                    t = new Todo(id, title); // 기본값: priority=3, due=null, desc=""
+                    if (done) t.markDone();
+                }
 
                 todos.add(t);
-                if (id > maxId) maxId = id;
+                if (t.getId() > maxId) maxId = t.getId();
             }
 
             System.out.println("불러오기 완료! (" + todos.size() + "개)");
@@ -246,5 +301,49 @@ public class Main {
             if (t.getId() > maxId) maxId = t.getId();
         }
         return maxId + 1;
+    }
+
+    private static Todo parseKeyValueTodo(String line) {
+        Integer id = null;
+        boolean done = false;
+        int priority = 3;
+        LocalDate due = null;
+        String title = "";
+        String desc = "";
+
+        String[] pairs = line.split("\\|");
+        for (String pair : pairs) {
+            int idx = pair.indexOf('=');
+            if (idx < 0) continue;
+
+            String key = pair.substring(0, idx).trim();
+            String value = pair.substring(idx + 1).trim();
+
+            switch (key) {
+                case "id" -> id = Integer.parseInt(value);
+                case "done" -> done = Boolean.parseBoolean(value);
+                case "priority" -> priority = Integer.parseInt(value);
+                case "due" -> { if (!value.isEmpty()) due = LocalDate.parse(value); }
+                case "title" -> title = decode(value);
+                case "desc" -> desc = decode(value);
+            }
+        }
+
+        if (id == null) return null;
+
+        Todo t = new Todo(id, title, priority, due, desc);
+        if (done) t.markDone();
+        return t;
+    }
+
+    private static String encode(String s) {
+        if (s == null) return "";
+        s = s.replace("\n", " ").replace("\r", " ");
+        return java.net.URLEncoder.encode(s, StandardCharsets.UTF_8);
+    }
+
+    private static String decode(String s) {
+        if (s == null || s.isEmpty()) return "";
+        return java.net.URLDecoder.decode(s, StandardCharsets.UTF_8);
     }
 }

@@ -1,4 +1,0 @@
-1|false|운동
-2|false|자바
-3|false|게임
-4|false|주식
