@@ -9,8 +9,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 
 public class Main {
-
     private static final Path DATA_PATH = Path.of("orbit_todos.txt");
+    private static boolean dirty = false;
 
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
@@ -93,10 +93,16 @@ public class Main {
             } else if (choice == 8) { // 불러오기
                 nextId = loadFromFile(todos);
 
-            } else if (choice == 9) { // 종료 (항상 마지막)
+            } else if (choice == 9) { // 종료
+                if (dirty) {
+                    boolean save = readYesNo(sc, "저장되지 않은 변경사항이 있어. 저장할까? (y/n): ");
+                    if (save) {
+                        saveToFile(todos);
+                        dirty = false;
+                    }
+                }
                 System.out.println("종료합니다.");
                 break;
-
             } else {
                 System.out.println("잘못된 선택입니다. (1~9)");
             }
@@ -129,6 +135,16 @@ public class Main {
             } catch (NumberFormatException e) {
                 System.out.println("숫자를 입력해줘.");
             }
+        }
+    }
+
+    private static boolean readYesNo(Scanner sc, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = sc.nextLine().trim().toLowerCase();
+            if (line.equals("y") || line.equals("yes")) return true;
+            if (line.equals("n") || line.equals("no")) return false;
+            System.out.println("y 또는 n으로 입력해줘.");
         }
     }
 
