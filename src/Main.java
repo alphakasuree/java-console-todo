@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 
 public class Main {
     private static final Path DATA_PATH = Path.of("orbit_todos.txt");
@@ -30,6 +31,7 @@ public class Main {
                 todos.add(new Todo(nextId, title, priority, due, desc));
                 System.out.println("추가 완료! (id=" + nextId + ")");
                 nextId++;
+                dirty = true;
 
             } else if (choice == 2) { // 목록
                 printTodos(todos);
@@ -44,6 +46,7 @@ public class Main {
                         System.out.println("이미 완료된 항목입니다!");
                     } else {
                         t.markDone();
+                        dirty = true;
                         System.out.println("완료 처리됨!");
                     }
                 }
@@ -52,6 +55,7 @@ public class Main {
                 int id = readInt(sc, "삭제할 id 입력: ");
                 boolean removed = removeById(todos, id);
                 if (removed) {
+                    dirty = true;
                     System.out.println("삭제 완료!");
                 } else {
                     System.out.println("해당 id를 찾을 수 없습니다.");
@@ -65,6 +69,7 @@ public class Main {
                 } else {
                     String newTitle = readNonEmptyLine(sc, "새 제목 입력: ");
                     t.setTitle(newTitle);
+                    dirty = true;
                     System.out.println("수정 완료!");
                 }
 
@@ -89,9 +94,11 @@ public class Main {
 
             } else if (choice == 7) { // 저장
                 saveToFile(todos);
+                dirty = false;
 
             } else if (choice == 8) { // 불러오기
                 nextId = loadFromFile(todos);
+                dirty = false;
 
             } else if (choice == 9) { // 종료
                 if (dirty) {
@@ -193,23 +200,29 @@ public class Main {
 
         System.out.println("=== 할 일 목록 (미완료 먼저) ===");
 
-        int done = 0;
-        for (Todo t : todos) {
-            if (t.isDone()) done++;
-        }
+        // 1) 미완료 목록만 모아서 정렬 후 출력
+        ArrayList<Todo> undone = new ArrayList<>();
+        ArrayList<Todo> doneList = new ArrayList<>();
 
         for (Todo t : todos) {
-            if (!t.isDone()) t.print();
-        }
-        for (Todo t : todos) {
-            if (t.isDone()) t.print();
+            if (t.isDone()) doneList.add(t);
+            else undone.add(t);
         }
 
-        int total = todos.size();
-        int remaining = total - done;
-        int percent = (total == 0) ? 0 : (done * 100 / total);
+        // 정렬 규칙: OrbitRank 높은 순 → (동점이면) 마감 빠른 순
+        undone.sort(
+                java.util.Comparator.comparingInt(Main::calcOrbitRank).reversed()
+                        .thenComparing(Main::dueOrMax)
+        );
 
-        System.out.println("총 " + total + "개 / 완료 " + done + "개 / 남은 " + remaining + "개 (" + percent + "%)");
+        doneList.sort(
+                java.util.Comparator.comparingInt(Main::calcOrbitRank).reversed()
+                        .thenComparing(Main::dueOrMax)
+        );
+
+        // 출력
+        for (Todo t : undone) t.print();
+        for (Todo t : doneList) t.print();
     }
 
     private static Todo findById(ArrayList<Todo> todos, int id) {
@@ -229,9 +242,19 @@ public class Main {
         return false;
     }
 
-    // ====== 저장/불러오기 ======
-    // 포맷: id|done|title  (한 줄 = 한 Todo)
-    // 예: id=1|done=false|priority=3|due=2026-03-10|title=...|desc=...
+    // ====== 저장/불러오기 (Persistence) ======
+    // 저장 파일: orbit_todos.txt (UTF-8)
+    //
+    // 현재 저장 포맷 (확장 가능한 key=value)
+    // - 한 줄 = 한 Todo
+    // - 예:
+    //   id=1|done=false|priority=3|due=2026-03-10|title=...|desc=...
+    //
+    // 문자열 안전 처리
+    // - title/desc는 '|', '=', 줄바꿈 등이 포함될 수 있어 URL 인코딩(encode/decode)로 안전하게 저장
+    //
+    // 구포맷 호환(이전 버전 파일 지원)
+    // - 이전 파일이 "id|done|title" 형태여도 loadFromFile에서 자동으로 읽어줌
     private static void saveToFile(ArrayList<Todo> todos) {
         List<String> lines = new ArrayList<>();
 
@@ -361,5 +384,31 @@ public class Main {
     private static String decode(String s) {
         if (s == null || s.isEmpty()) return "";
         return java.net.URLDecoder.decode(s, StandardCharsets.UTF_8);
+    }
+
+    // OrbitRank: 점수가 높을수록 "안쪽 궤도(급함/중요)"로 보이게 할 기준
+    private static int calcOrbitRank(Todo t) {
+        // priority 기본 점수(1~5 → 10~50점)
+        int score = t.getPriority() * 10;
+
+        // 마감이 없으면 urgency 보너스 없음
+        if (t.getDueDate() == null) return score;
+
+        long daysLeft = ChronoUnit.DAYS.between(LocalDate.now(), t.getDueDate());
+
+        // 마감 임박 보너스(룰은 나중에 조정 가능)
+        if (daysLeft < 0) score += 100;       // 이미 지남(최우선)
+        else if (daysLeft == 0) score += 80;  // 오늘 마감
+        else if (daysLeft <= 1) score += 60;  // 내일/모레급
+        else if (daysLeft <= 3) score += 40;
+        else if (daysLeft <= 7) score += 20;
+        // 그 이상은 보너스 0
+
+        return score;
+    }
+
+    // 정렬 동점 처리용: dueDate가 없으면 가장 뒤로
+    private static LocalDate dueOrMax(Todo t) {
+        return (t.getDueDate() == null) ? LocalDate.MAX : t.getDueDate();
     }
 }

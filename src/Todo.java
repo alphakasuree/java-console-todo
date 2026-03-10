@@ -4,9 +4,9 @@ public class Todo {
     private int id;
     private String title;
     private boolean done;
-    private int priority;      // 1~5
-    private LocalDate dueDate; // 없으면 null
-    private String description; // 없으면 ""
+    private int priority;      // priority: 1(낮음) ~ 5(높음)
+    private LocalDate dueDate; // dueDate: 마감일(없으면 null)
+    private String description; // description: 상세 메모(없으면 빈 문자열)
 
     public Todo(int id, String title) {
         this(id, title, 3, null, "");
